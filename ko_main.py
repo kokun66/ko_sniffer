@@ -8,7 +8,9 @@ import re
 import time
 import random
 import logging
+import io
 import os
+from urllib.parse import urljoin
 
 class KoCrawler:
     def __init__(self, 
@@ -24,13 +26,11 @@ class KoCrawler:
         # Create handlers
         self.console_handler = logging.StreamHandler()
         self.console_handler.setLevel(args.verbose_level)
-        #self.console_handler.setLevel(logging.CRITICAL + 1) # if want to turn it off
 
         self.logfile_handler = logging.FileHandler(log_file, mode='w')
         self.logfile_handler.setLevel(verbose_level)
 
         # Create a formatter and set it for both handlers
-        #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         self.console_handler.setFormatter(formatter)
         self.logfile_handler.setFormatter(formatter)
@@ -90,38 +90,27 @@ class KoCrawler:
         self.logger.info(f"total image urls: {len(img_urls)}")
 
         # Filter and save images with "felix" in the name
-        for img_idx, img_url in enumerate(img_urls, start=1):        
-            self.logger.info(f"[{img_idx}]: {img_url}")
-            if search_name in img_url.lower():
+        for img_idx, img_sub_url in enumerate(img_urls, start=1):        
+            self.logger.info(f"[{img_idx}]: {img_sub_url}")
+            if search_name in img_sub_url.lower():
                 try:
                     # Download image
+                    img_url = urljoin(seed_url, img_sub_url)
                     img_response = requests.get(img_url)
                     img = Image.open(io.BytesIO(img_response.content))
                     
-                    # Generate filename
-                    filename = os.path.join(self.data_dir, os.path.basename(img_url))
-                    
+                    # Extract the filename from the path
+                    filename = os.path.basename(img_url)
+                    # Remove any query parameters
+                    filename = filename.split('?')[0]
+                    filename = os.path.join(self.data_dir, filename)
+
                     # Save image
                     img.save(filename)
-                    print(f"Saved: {filename}")
+                    self.logger.info(f"Saved: {filename}")
                 except Exception as e:
-                    print(f"Error saving {img_url}: {str(e)}")
-
-
-
-    def crawl_page(self, soup, url, visited_urls, que_urls, log): 
-        link_elements = soup.select("a[href]")
-        for link_element in link_elements:
-            curr_url = link_element['href']
-            log.info(f"crawl: {curr_url}")
-            if curr_url not in visited_urls and curr_url not in [item[1] for item in que_urls.queue]:                
-                if re.match(r"^https://scrapingcourse\.com/shop/page/\d+/?$", url):
-                    priority_score = 0.5
-                else:
-                    priority_score = 1.0
-                que_urls.put((priority_score, url))
-            time.sleep(0.5)
-
+                    self.logger.error(f"Error saving {img_url}: {str(e)}")
+    
     
 ''''''        
 def main(args):   
@@ -145,7 +134,7 @@ def parse_args():
     parser = ArgumentParser()
 
     #parser.add_argument('img', help='Image file')
-    parser.add_argument('--seed-url', default="https://www.scrapingcourse.com/ecommerce/", help='starting url')
+    parser.add_argument('--seed-url', default="https://kpopping.com/kpics/", help='starting url')
     parser.add_argument('--search-name', default="felix", help='the pattern to match')
     parser.add_argument('--max-urls', type=int, default=50, help='')
     parser.add_argument('--verbose-level', type=int, default=20, help='logging level')
