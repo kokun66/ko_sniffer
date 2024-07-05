@@ -12,10 +12,11 @@
             "console": "integratedTerminal",
             "justMyCode": false,  // This allows debugging into installed (library) code
             "args": [ 
-                "--seed-url", "https://www.scrapingcourse.com/ecommerce/",
+                "--seed-url", "https://kpopping.com/kpics/",
+                "--search-name", "felix",
                 "--max-urls", "20",
                 "--verbose-level", "20"
-                "--log-file", "ko_logging.txt",
+                "--log-file", "kologging.txt",
             ],
             "env": {
             //    "PYTHONPATH": "/home/qun.gu/my_project/workspace/lti_det/Co-DETR",
