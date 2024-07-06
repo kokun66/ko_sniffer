@@ -42,7 +42,7 @@ class KoCrawler:
         self.create_data_dir(data_dir)
 
         self.urls_limit = urls_limit
-        self.url_visited = 0
+        self.url_visited = 1
 
         # Log messages
         self.logger.info(f"started  with url_limit={self.urls_limit}, saved at {self.data_dir}")
@@ -72,45 +72,70 @@ class KoCrawler:
         try: 
             return requests.get(url).content 
         except Exception as e: 
-            print(e) 
+            self.logger.error(e) 
             return ''
         
+    ''''''
     def scrape_and_save_images(self, seed_url: str=None, search_name: str=None): 
-        # Fetch the web page
-        response = requests.get(seed_url)
+        cur_url = seed_url
+        while (self.url_visited <= self.urls_limit) and (cur_url is not None):
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Find all image tags
-        img_tags = soup.find_all('img')
-        
-        # Extract image URLs
-        img_urls = [img['src'] for img in img_tags if 'src' in img.attrs]
-        
-        self.logger.info(f"total image urls: {len(img_urls)}")
+            # Fetch the web page
+            response = requests.get(cur_url)
+            # Check if the request was successful
+            if response.status_code != 200:
+                self.logger.error(f"Failed to retrieve page: {response.status_code}")
+                break
 
-        # Filter and save images with "felix" in the name
-        for img_idx, img_sub_url in enumerate(img_urls, start=1):        
-            self.logger.info(f"[{img_idx}]: {img_sub_url}")
-            if search_name in img_sub_url.lower():
-                try:
-                    # Download image
-                    img_url = urljoin(seed_url, img_sub_url)
-                    img_response = requests.get(img_url)
-                    img = Image.open(io.BytesIO(img_response.content))
-                    
-                    # Extract the filename from the path
-                    filename = os.path.basename(img_url)
-                    # Remove any query parameters
-                    filename = filename.split('?')[0]
-                    filename = os.path.join(self.data_dir, filename)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            print(soup.prettify()[:1000])  # Print the first 1000 characters of the HTML
+            results=[]
+            # Example: Extracting all items with a specific class
+            items = soup.find_all('div', class_='item')
+            print(f"Number of items found: {len(items)}")
+            for item in items:
+                results.append(item.text.strip())
+                
+            # Find all image tags
+            img_tags = soup.find_all('img')
+            
+            # Extract image URLs
+            img_urls = [img['src'] for img in img_tags if 'src' in img.attrs]
+            
+            self.logger.info(f"total image urls: {len(img_urls)}")
 
-                    # Save image
-                    img.save(filename)
-                    self.logger.info(f"Saved: {filename}")
-                except Exception as e:
-                    self.logger.error(f"Error saving {img_url}: {str(e)}")
-    
+            # Filter and save images with "felix" in the name
+            for img_idx, img_sub_url in enumerate(img_urls, start=1):        
+                self.logger.info(f"[{img_idx}]: {img_sub_url}")
+                if search_name in img_sub_url.lower():
+                    try:
+                        # Download image
+                        img_url = urljoin(seed_url, img_sub_url)
+                        img_response = requests.get(img_url)
+                        img = Image.open(io.BytesIO(img_response.content))
+                        
+                        # Extract the filename from the path
+                        filename = os.path.basename(img_url)
+                        # Remove any query parameters
+                        filename = filename.split('?')[0]
+                        filename = os.path.join(self.data_dir, filename)
+
+                        # Save image
+                        img.save(filename)
+                        self.logger.info(f"Saved: {filename}")
+                    except Exception as e:
+                        self.logger.error(f"Error saving {img_url}: {str(e)}")
+        
+            # Find the next page link
+            next_page = soup.find('a', {'rel': 'next'})  # or use the appropriate identifier for the next page link            
+            if next_page and 'href' in next_page.attrs:
+                cur_url = next_page['href']
+                # If the next page link is a relative URL, you might need to construct the full URL
+                if not cur_url.startswith('http'):
+                    cur_url = urljoin(seed_url, cur_url)
+            else:
+                # No more pages to process
+                cur_url = None
     
 ''''''        
 def main(args):   
